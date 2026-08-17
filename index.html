@@ -1,37 +1,349 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Note Hum（ノートハム）| ハミング採譜アプリ</title>
-  <meta name="description" content="鼻歌を歌うだけでリアルタイムに五線譜になる採譜アプリ" />
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Note Hum（ノートハム）| 歌うだけで、楽譜になる。ハミング採譜Webアプリ</title>
+<meta name="description" content="Note Humは、鼻歌を歌うだけでその場で五線譜に変換するハミング採譜Webアプリ。処理はすべてブラウザ内で完結し、音声データはサーバーに送信しません。MIDI・MusicXML書き出しにも対応。インストール不要。" />
+<link rel="icon" type="image/png" href="favicon.png" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic", "Helvetica Neue", sans-serif;
+    background: #0a0716;
+    color: #f2f0f8;
+    line-height: 1.7;
+    overflow: hidden;
+  }
+  .bg-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(600px circle at 80% 10%, rgba(139,60,220,0.25), transparent 60%),
+      radial-gradient(500px circle at 90% 70%, rgba(30,90,220,0.18), transparent 60%);
+    pointer-events: none;
+  }
+
+  #pager { position: relative; z-index: 1; height: 100svh; width: 100%; }
+  .page {
+    position: absolute; inset: 0;
+    display: flex; align-items: center;
+    padding: 60px 24px;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+  .page-inner { max-width: 1100px; width: 100%; margin: 0 auto; }
+  .page.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+  .stagger { opacity: 0; transform: translateY(28px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .page.active .stagger { opacity: 1; transform: translateY(0); }
+  .page.active .stagger:nth-child(1) { transition-delay: 0.05s; }
+  .page.active .stagger:nth-child(2) { transition-delay: 0.16s; }
+  .page.active .stagger:nth-child(3) { transition-delay: 0.27s; }
+  .page.active .stagger:nth-child(4) { transition-delay: 0.38s; }
+  .page.active .stagger:nth-child(5) { transition-delay: 0.49s; }
+  .page.active .flow-step.stagger:nth-child(1) { transition-delay: 0.15s; }
+  .page.active .flow-step.stagger:nth-child(3) { transition-delay: 0.35s; }
+  .page.active .flow-step.stagger:nth-child(5) { transition-delay: 0.55s; }
+  .page.active .privacy-item.stagger:nth-child(1) { transition-delay: 0.45s; }
+  .page.active .privacy-item.stagger:nth-child(2) { transition-delay: 0.55s; }
+  .page.active .privacy-item.stagger:nth-child(3) { transition-delay: 0.65s; }
+
+  .eyebrow {
+    display: inline-block; color: #ff3fa4; font-weight: 700;
+    letter-spacing: 0.08em; font-size: 0.85rem;
+    border-left: 3px solid #ff3fa4; padding-left: 10px; margin-bottom: 20px;
+  }
+  .grad-pink {
+    background: linear-gradient(90deg, #ff3fa4, #b23fff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  #dotnav {
+    position: fixed; right: 28px; top: 50%; transform: translateY(-50%);
+    z-index: 20; display: flex; flex-direction: column; gap: 22px;
+  }
+  #dotnav button {
+    all: unset; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+  }
+  #dotnav .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    transition: all 0.25s ease; flex-shrink: 0;
+  }
+  #dotnav .label {
+    font-size: 0.75rem; color: #9d97b8; white-space: nowrap;
+    opacity: 0; transform: translateX(6px); transition: all 0.2s ease;
+  }
+  #dotnav button:hover .label { opacity: 1; transform: translateX(0); }
+  #dotnav button.active .dot {
+    background: #ff3fa4; border-color: #ff3fa4;
+    box-shadow: 0 0 0 4px rgba(255,63,164,0.18);
+  }
+  #dotnav button.active .label { opacity: 1; transform: translateX(0); color: #ff8fc9; font-weight: 700; }
+
+  .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .brand img { width: 44px; height: 44px; border-radius: 12px; }
+  .brand-line { width: 46px; height: 3px; background: #ff3fa4; }
+
+  .hero-inner { max-width: 640px; }
+  .hero h1 {
+    font-size: clamp(2.6rem, 7vw, 4.4rem); font-weight: 800;
+    letter-spacing: 0.02em; line-height: 1.05; margin-bottom: 22px;
+  }
+  .hero-sub { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; color: #ddd8ee; margin-bottom: 10px; }
+  .hero-tag { color: #9d97b8; font-size: 1rem; margin-bottom: 40px; }
+  .hero-features {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 0.85rem; color: #b7b0cf; margin-bottom: 44px;
+  }
+  .hero-features span { white-space: nowrap; }
+  .hero-features span:not(:last-child)::after { content: "／"; margin-left: 14px; color: #55506e; }
+
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(90deg, #ff3fa4, #b23fff);
+    color: #fff; font-weight: 700; font-size: 1.1rem;
+    padding: 18px 40px; border-radius: 999px; text-decoration: none;
+    box-shadow: 0 8px 30px rgba(178,63,255,0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .cta:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 12px 36px rgba(178,63,255,0.5); }
+  .cta:active { transform: translateY(0) scale(0.99); }
+
+  .problem h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; line-height: 1.5; margin-bottom: 40px; }
+  .problem ul { list-style: none; max-width: 560px; }
+  .problem li {
+    position: relative; padding-left: 24px; padding-top: 18px; padding-bottom: 18px;
+    border-top: 1px solid rgba(255,255,255,0.08); color: #c7c2da; font-size: 1.05rem;
+  }
+  .problem li:last-child { border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .problem li::before {
+    content: ""; position: absolute; left: 0; top: 27px;
+    width: 8px; height: 8px; border-radius: 50%; background: #ff3fa4;
+  }
+
+  .solution h2 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-weight: 800; margin-bottom: 8px; }
+  .solution .solution-sub { color: #9d97b8; margin-bottom: 56px; }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; text-align: center; }
+  .flow-step { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 150px; }
+  .flow-icon {
+    width: 76px; height: 76px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 1.9rem;
+    background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.15);
+  }
+  .flow-icon.pink { border-color: #ff3fa4; color: #ff3fa4; }
+  .flow-title { font-weight: 700; }
+  .flow-desc { font-size: 0.82rem; color: #9d97b8; }
+  .flow-arrow { color: #ff3fa4; font-size: 1.6rem; }
+
+  .tech h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; margin-bottom: 8px; }
+  .tech .tech-sub { color: #9d97b8; margin-bottom: 42px; }
+  .pipeline { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 34px; }
+  .pipe-box {
+    flex: 1; min-width: 130px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 18px 14px; text-align: center;
+    font-size: 0.92rem; font-weight: 600;
+  }
+  .pipe-box.highlight { border-color: #ff3fa4; background: rgba(255,63,164,0.08); color: #ff8fc9; }
+  .pipe-box small { display:block; font-weight:400; color:#9d97b8; margin-top:6px; font-size:0.78rem; }
+  .privacy-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,63,164,0.07); border: 1px solid rgba(255,63,164,0.3);
+    border-radius: 14px; padding: 16px 22px; font-weight: 700; color: #ff8fc9; margin-bottom: 34px;
+  }
+  .privacy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 22px; }
+  .privacy-item .p-title { font-weight: 700; color: #f2f0f8; margin-bottom: 4px; }
+  .privacy-item .p-desc { font-size: 0.85rem; color: #9d97b8; }
+
+  .final-cta { text-align: center; }
+  .final-cta h2 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; margin-bottom: 34px; }
+  .final-cta footer { margin-top: 60px; color: #6f6a89; font-size: 0.82rem; }
+
+  #scrollHint {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    z-index: 20; color: #756f92; font-size: 0.78rem;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    animation: bob 1.8s ease-in-out infinite;
+  }
+  #scrollHint span { width: 1px; height: 22px; background: linear-gradient(#ff3fa4, transparent); }
+  @keyframes bob { 0%,100%{ transform: translate(-50%,0);} 50%{ transform: translate(-50%,6px);} }
+
+  @media (max-width: 640px) {
+    .page { padding: 90px 20px 60px; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+    #dotnav { right: 14px; gap: 16px; }
+    #dotnav .label { display: none; }
+  }
+</style>
 </head>
 <body>
-  <header>
-    <h1>🎵 Note Hum</h1>
-    <p>歌うだけで、楽譜になる。—— ハミング採譜アプリ</p>
-  </header>
-  <main>
-    <div class="controls">
-      <button id="recordBtn">🎤 録音開始</button>
-      <button id="playBtn">▶ 再生</button>
-      <button id="clearBtn">クリア</button>
-      <label>テンポ <input type="number" id="bpm" value="100" min="40" max="240" /> BPM</label>
+<div class="bg-glow"></div>
+
+<nav id="dotnav"></nav>
+<div id="scrollHint"><span></span>SCROLL</div>
+
+<div id="pager">
+
+  <section class="page" data-title="Home">
+    <div class="page-inner hero-inner">
+      <div class="brand stagger">
+        <img src="favicon.png" alt="Note Hum アイコン" />
+        <div class="brand-line"></div>
+      </div>
+      <h1 class="stagger">Note <span class="grad-pink">Hum</span></h1>
+      <p class="hero-sub stagger">歌うだけで、<span class="grad-pink">楽譜</span>になる。</p>
+      <p class="hero-tag stagger">ハミング入力・自動採譜 Webアプリ</p>
+      <div class="hero-features stagger">
+        <span>ブラウザで完結</span><span>MIDI再生</span><span>MusicXML書き出し</span>
+      </div>
+      <a class="cta stagger" href="app.html">はじめる →</a>
     </div>
-    <div class="status">
-      <div id="pitchDisplay">♪ --- Hz</div>
-      <div id="noteDisplay">--</div>
+  </section>
+
+  <section class="page problem" data-title="課題">
+    <div class="page-inner">
+      <span class="eyebrow stagger">課題</span>
+      <h2 class="stagger">頭に浮かんだメロディ、<br>楽譜にできないまま<br><span class="grad-pink">忘れてしまった</span>こと、ありませんか？</h2>
+      <ul>
+        <li class="stagger">耳コピには訓練と時間が必要</li>
+        <li class="stagger">採譜ソフトは操作が難しく、習得コストが高い</li>
+        <li class="stagger">思いついた瞬間にメモする手軽な手段がない</li>
+      </ul>
     </div>
-    <div id="score" class="score"></div>
-    <div class="exports">
-      <button id="midiBtn">MIDI を保存</button>
-      <button id="xmlBtn">MusicXML を保存</button>
-      <button id="pngBtn">楽譜画像(PNG)を保存</button>
+  </section>
+
+  <section class="page solution" data-title="解決策">
+    <div class="page-inner">
+      <span class="eyebrow stagger">解決策</span>
+      <h2 class="stagger">歌うだけで、<span class="grad-pink">楽譜になる</span></h2>
+      <p class="solution-sub stagger">Note Hum は、ハミングをその場で五線譜に変換するWebアプリです</p>
+      <div class="flow">
+        <div class="flow-step stagger">
+          <div class="flow-icon pink">🎤</div>
+          <div class="flow-title">ハミング入力</div>
+          <div class="flow-desc">マイクに向かって歌うだけ</div>
+        </div>
+        <div class="flow-arrow stagger">→</div>
+        <div class="flow-step stagger">
+          <div class="flow-icon pink">🧠</div>
+          <div class="flow-title">AI採譜</div>
+          <div class="flow-desc">ピッチをリアルタイム推定</div>
+        </div>
+        <div class="flow-arrow stagger">→</div>
+        <div class="flow-step stagger">
+          <div class="flow-icon pink">🎵</div>
+          <div class="flow-title">五線譜</div>
+          <div class="flow-desc">音符がその場で表示</div>
+        </div>
+      </div>
+      <div class="hero-features stagger" style="justify-content:center; margin-top:48px;">
+        <span>MIDI再生で即チェック</span><span>MusicXML書き出し対応</span><span>インストール不要</span>
+      </div>
     </div>
-  </main>
-  <footer>Note Hum</footer>
-  <script src="app.js"></script>
+  </section>
+
+  <section class="page tech" data-title="技術">
+    <div class="page-inner">
+      <span class="eyebrow stagger">技術ポイント</span>
+      <h2 class="stagger">処理はすべて<span class="grad-pink">ブラウザ内</span>で完結</h2>
+      <p class="tech-sub stagger">AIピッチ推定をクライアント側で実行するシステム構成</p>
+
+      <div class="pipeline stagger">
+        <div class="pipe-box">マイク入力</div>
+        <div class="pipe-box highlight">AIピッチ推定<small>ブラウザ内で実行</small></div>
+        <div class="pipe-box">音符データ</div>
+        <div class="pipe-box">五線譜表示・MIDI再生<small>MusicXML書き出し</small></div>
+      </div>
+
+      <div class="privacy-banner stagger">🛡️ 音声はサーバーに送りません</div>
+
+      <div class="privacy-grid">
+        <div class="privacy-item stagger">
+          <div class="p-title">プライバシーに配慮</div>
+          <div class="p-desc">歌声データは端末の外に出ません</div>
+        </div>
+        <div class="privacy-item stagger">
+          <div class="p-title">低遅延</div>
+          <div class="p-desc">通信を挟まないから応答が速い</div>
+        </div>
+        <div class="privacy-item stagger">
+          <div class="p-title">サーバー負荷ゼロ</div>
+          <div class="p-desc">推論コストのかからない構成</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page final-cta" data-title="はじめる">
+    <div class="page-inner">
+      <h2 class="stagger">思いついたメロディを、<span class="grad-pink">今すぐ形に。</span></h2>
+      <a class="cta stagger" href="app.html">Note Hum をはじめる →</a>
+      <footer class="stagger">Note Hum</footer>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const pages = Array.from(document.querySelectorAll('.page'));
+  const nav = document.getElementById('dotnav');
+  const hint = document.getElementById('scrollHint');
+  let current = 0;
+  let animating = false;
+
+  pages.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.innerHTML = `<span class="label">${p.dataset.title}</span><span class="dot"></span>`;
+    btn.addEventListener('click', () => goTo(i));
+    nav.appendChild(btn);
+  });
+  const dots = Array.from(nav.querySelectorAll('button'));
+
+  function render() {
+    pages.forEach((p, i) => p.classList.toggle('active', i === current));
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    hint.style.opacity = current === 0 ? '1' : '0';
+  }
+
+  function goTo(i) {
+    if (i < 0 || i >= pages.length || i === current || animating) return;
+    animating = true;
+    current = i;
+    render();
+    setTimeout(() => { animating = false; }, 550);
+  }
+
+  render();
+
+  let wheelLock = false;
+  window.addEventListener('wheel', (e) => {
+    if (wheelLock) return;
+    if (Math.abs(e.deltaY) < 12) return;
+    wheelLock = true;
+    if (e.deltaY > 0) goTo(current + 1); else goTo(current - 1);
+    setTimeout(() => { wheelLock = false; }, 700);
+  }, { passive: true });
+
+  let touchStartY = null;
+  window.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchend', (e) => {
+    if (touchStartY === null) return;
+    const diff = touchStartY - e.changedTouches[0].clientY;
+    if (Math.abs(diff) > 50) { if (diff > 0) goTo(current + 1); else goTo(current - 1); }
+    touchStartY = null;
+  }, { passive: true });
+
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowDown','PageDown',' '].includes(e.key)) { e.preventDefault(); goTo(current + 1); }
+    if (['ArrowUp','PageUp'].includes(e.key)) { e.preventDefault(); goTo(current - 1); }
+  });
+</script>
 </body>
 </html>

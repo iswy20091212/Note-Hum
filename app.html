@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Note Hum（ノートハム）| ハミング採譜アプリ</title>
+  <link rel="icon" type="image/png" href="favicon.png?v=2" />
+  <meta name="description" content="鼻歌を歌うだけでリアルタイムに五線譜になる採譜アプリ" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Note Hum</h1>
+    <p>ー  歌うだけで、楽譜になる。—— </p>
+  </header>
+  <main>
+    <div class="controls">
+      <button id="recordBtn">🎤 録音開始</button>
+      <button id="playBtn">▶ 再生</button>
+      <button id="clearBtn">クリア</button>
+      <label>テンポ <input type="number" id="bpm" value="100" min="40" max="240" /> BPM</label>
+    </div>
+    <div class="status">
+      <div id="pitchDisplay">♪ --- Hz</div>
+      <div id="noteDisplay">--</div>
+    </div>
+    <div id="score" class="score"></div>
+    <div class="exports">
+      <button id="midiBtn">MIDI を保存</button>
+      <button id="xmlBtn">MusicXML を保存</button>
+      <button id="pngBtn">楽譜画像(PNG)を保存</button>
+    </div>
+  </main>
+  <footer>Note Hum</footer>
+  <script src="app.js"></script>
+</body>
+</html>
