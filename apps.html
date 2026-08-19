@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Note Hum（ノートハム）| ハミング採譜アプリ</title>
+  <link rel="icon" type="image/png" href="favicon.png?v=2" />
+  <meta name="description" content="鼻歌を歌うだけでリアルタイムに五線譜になる採譜アプリ" />
+  <meta property="og:title" content="Note Hum（ノートハム）| 歌うだけで、楽譜になる。" />
+  <meta property="og:description" content="鼻歌を歌うだけでその場で五線譜に変換するハミング採譜Webアプリ。処理はすべてブラウザ内で完結。" />
+  <meta property="og:image" content="https://new.note-hum.jp/ogp.png" />
+  <meta property="og:url" content="https://new.note-hum.jp/" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+  <style>
+    #termsOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 15, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #termsOverlay.hidden { display: none; }
+    #termsBox {
+      background: #fff;
+      max-width: 420px;
+      width: 90%;
+      border-radius: 14px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    #termsBox h2 { font-size: 1.2rem; margin-bottom: 14px; }
+    #termsBox p { font-size: 0.92rem; color: #444; line-height: 1.7; margin-bottom: 20px; }
+    #termsBox a { color: #2f6fd0; text-decoration: underline; }
+    #termsBtns { display: flex; gap: 12px; justify-content: center; }
+    #termsBtns button {
+      font-size: 0.95rem;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    #agreeBtn { background: #2f6f4f; color: #fff; }
+    #disagreeBtn { background: #ddd; color: #333; }
+  </style>
+</head>
+<body>
+  <div id="termsOverlay">
+    <div id="termsBox">
+      <h2>利用規約への同意</h2>
+      <p>
+        Note Humをご利用いただく前に、<a href="https://note-hum.jp/terms" target="_blank" rel="noopener">利用規約</a>をご確認ください。
+        本アプリは音声データをサーバーに送信せず、ブラウザ内で処理を完結します。
+        利用規約に同意しますか？
+      </p>
+      <div id="termsBtns">
+        <button id="agreeBtn">同意する</button>
+        <button id="disagreeBtn">同意しない</button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <h1>Note Hum</h1>
+    <p>ー  歌うだけで、楽譜になる。—— </p>
+  </header>
+  <main>
+    <div class="controls">
+      <button id="recordBtn">🎤 録音開始</button>
+      <button id="playBtn">▶ 再生</button>
+      <button id="clearBtn">クリア</button>
+      <label>テンポ <input type="number" id="bpm" value="100" min="40" max="240" /> BPM</label>
+    </div>
+    <div class="status">
+      <div id="pitchDisplay">♪ --- Hz</div>
+      <div id="noteDisplay">--</div>
+    </div>
+    <div id="score" class="score"></div>
+    <div class="exports">
+      <button id="midiBtn">MIDI を保存</button>
+      <button id="xmlBtn">MusicXML を保存</button>
+      <button id="pngBtn">楽譜画像(PNG)を保存</button>
+    </div>
+  </main>
+  <footer>Note Hum ／ <a href="https://note-hum.jp/terms" target="_blank" rel="noopener" style="color:#4fa8ff;">利用規約</a></footer>
+  <script src="app.js"></script>
+
+  <script>
+    (function () {
+      const overlay = document.getElementById('termsOverlay');
+      const agreed = localStorage.getItem('notehum-terms-agreed') === 'true';
+      if (agreed) {
+        overlay.classList.add('hidden');
+      }
+      document.getElementById('agreeBtn').addEventListener('click', () => {
+        localStorage.setItem('notehum-terms-agreed', 'true');
+        overlay.classList.add('hidden');
+      });
+      document.getElementById('disagreeBtn').addEventListener('click', () => {
+        localStorage.removeItem('notehum-terms-agreed');
+        window.location.href = 'https://note-hum.jp/';
+      });
+    })();
+  </script>
+</body>
+</html>
